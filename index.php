@@ -35,8 +35,9 @@ function getListOfExplanations($explanations) {
 }
 
 function processingQuery($array) {
+    global $mysqli;
     foreach ($array as $key => &$value) {
-        $query[$key] = trim( mysql_real_escape_string(strip_tags($value)), ' .,\|/*-+"');
+        $query[$key] = trim( $mysqli->real_escape_string(strip_tags($value)), ' .,\|/*-+"');
     }
     $query['price'] = (float) $query['price'];
     return $query;
@@ -50,11 +51,6 @@ $page_from = 'index.php';
 include($mysql_dir . '/mysql.php');
 
 db_setup();
-
-
-if (isset($_POST['button_singout'])){
-    sing_out();
-}
 
 $id = (isset($_GET['id'])) ? $_GET['id'] : '';
 

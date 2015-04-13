@@ -29,7 +29,7 @@ function dropOldTables($db) {
         $mysqli->query($row['drop']) or die(mysql_error());
     }
     $result->free();
-    mysql_query("SET FOREIGN_KEY_CHECKS = 1");
+    $mysqli->query("SET FOREIGN_KEY_CHECKS = 1");
 }
 
 function parceDump($dump_filename, $i = 0, $j = 0) {
@@ -56,6 +56,19 @@ function parceDump($dump_filename, $i = 0, $j = 0) {
 //
 $mysql_dir = $project_root;
 $page_from = 'install.php';
+$filename_user = 'user.php';
+
+if (!isset($_POST['button_install'])) {
+    $smarty->assign('title', 'Вход в базу данных');
+    $smarty->assign('message', 'Введите данные для подключения к БД');
+    $smarty->assign('action', 'install.php');
+    $smarty->display('user_ini.tpl');
+    exit;
+}   
+if (file_exists($filename_user)){
+    unlink($filename_user);
+}
+
 include ($mysql_dir . '/mysql.php');
 db_setup();
 

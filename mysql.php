@@ -6,8 +6,8 @@ header("Content-Type: text/html; charset=utf-8");
 
 
 // Подключение к БД
-
-$filename_user = user_initialization($page_from);           //инициализация пользовотеля
+$filename_user = 'user.php';
+user_initialization($page_from);           //инициализация пользовотеля
 $user = unserialize(file_get_contents($filename_user));
 
 $mysqli = new mysqli($user['s_name'], $user['u_name'], $user['pas'], $user['db_name']);
@@ -29,7 +29,7 @@ $message = "Соединение с БД установлено.<br>";
 
 function user_initialization($page_from) {
     global $smarty;
-    $filename_user = 'user.php';
+    global $filename_user;
     if (!file_exists($filename_user)) {
 
         if (!isset($_POST['button_install'])) {
@@ -52,7 +52,6 @@ function user_initialization($page_from) {
             exit('Ошибка: неверный формат файла ' . $filename_user);
         }
     }
-    return $filename_user;
 }
 
 function db_setup() {
@@ -76,25 +75,6 @@ function db_setup() {
         header('Location: ' . 'install.php');
     }
 }
-
-//function db_connect($page_from) {
-//    global $smarty;
-//    global $message;
-//    global $mysqli;
-//
-//    $filename_user = user_initialization($page_from);
-//    $user = unserialize(file_get_contents($filename_user));
-//
-//    $mysqli = new mysqli($user['s_name'], $user['u_name'], $user['pas'], $user['db_name']);
-//    if ($mysqli->connect_error) {
-//        echo "Ошибка соединения с базой данных. " . $mysqli->connect_error;
-//        unlink($filename_user);
-//    }
-//    $mysqli->query("SET NAMES utf8");
-//    $message = "Соединение с БД установлено.<br>";
-//
-//    return $user;
-//}
 
 function getCitiesList() {
     global $mysqli;
