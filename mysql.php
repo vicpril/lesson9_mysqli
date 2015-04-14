@@ -4,78 +4,6 @@ error_reporting(E_ERROR | E_WARNING | E_PARSE | E_NOTICE);
 ini_set('display_errors', 1);
 header("Content-Type: text/html; charset=utf-8");
 
-
-// Подключение к БД
-$filename_user = 'user.php';
-user_initialization($page_from);           //инициализация пользовотеля
-$user = unserialize(file_get_contents($filename_user));
-
-$mysqli = new mysqli($user['s_name'], $user['u_name'], $user['pas'], $user['db_name']);
-if ($mysqli->connect_errno) {
-    exit("Не удалось подключиться к MySQL: (" . $mysqli->connect_errno . ") " . $mysqli->connect_error
-    . unlink($filename_user)
-    . '<br><a href="#" onclick="history.go(-1)">Go Back</a>');
-}
-if ($user['db_name'] == '') {
-    exit("Введено пустое имя БД" . $mysqli->connect_error
-    . unlink($filename_user)
-    . '<br><a href="#" onclick="history.go(-1)">Go Back</a>');
-}
-
-$mysqli->query("SET NAMES utf8");
-$message = "Соединение с БД установлено.<br>";
-
-// Функции
-
-function user_initialization($page_from) {
-    global $smarty;
-    global $filename_user;
-    if (!file_exists($filename_user)) {
-
-        if (!isset($_POST['button_install'])) {
-            $smarty->assign('title', 'Вход в базу данных');
-            $smarty->assign('message', 'Введите данные для подключения к БД');
-            $smarty->assign('action', $page_from);
-            $smarty->display('user_ini.tpl');
-            exit;
-        } else {
-            $user['db_name'] = $_POST['database_name'];
-            $user['s_name'] = $_POST['server_name'];
-            $user['u_name'] = $_POST['user_name'];
-            $user['pas'] = $_POST['password'];
-            if (!file_put_contents($filename_user, serialize($user))) {
-                exit('Ошибка: не удалось записать фаил ' . $filename_user);
-            }
-        }
-    } else {
-        if (!file_get_contents($filename_user)) {
-            exit('Ошибка: неверный формат файла ' . $filename_user);
-        }
-    }
-}
-
-function db_setup() {
-    global $mysqli;
-    global $message;
-    global $user;
-    $db_name = $user['db_name'];
-    $tables = array();
-    $query = "SHOW TABLES FROM $db_name";
-    $result = $mysqli->query($query);
-    while ($row = $result->fetch_array()) {
-        $tables[] = $row[0];
-    }
-    $result->free();
-    if (in_array('explanations', $tables) &&
-            in_array('categories_list', $tables) &&
-            in_array('cities_list', $tables)) {
-        $message .= "<br>Таблицы установлены.";
-        
-    } else {
-        header('Location: ' . 'install.php');
-    }
-}
-
 function getCitiesList() {
     global $mysqli;
     $query = "SELECT * FROM cities_list";
@@ -120,12 +48,64 @@ function add_explanation_into_db($exp, $id) {
     global $mysqli;
     $query = "REPLACE INTO explanations (`id`, `private`, `seller_name`, `email`, `allow_mails`, `phone`, `location_id`, `category_id`, `title`, `description`, `price`)
                     VALUES ('" . $id . "', '" . $exp['private'] . "', '" . $exp['seller_name'] . "' , '" . $exp['email'] . "', '" . $exp['allow_mails'] . "', '"
-                    . $exp['phone'] . "', '" . $exp['location_id'] . "', '" . $exp['category_id'] . "', '" . $exp['title'] . "', '"
-                    . $exp['description'] . "', '" . $exp['price'] . "')";
+            . $exp['phone'] . "', '" . $exp['location_id'] . "', '" . $exp['category_id'] . "', '" . $exp['title'] . "', '"
+            . $exp['description'] . "', '" . $exp['price'] . "')";
     $mysqli->query($query) or die("REPLACE abort " . $mysqli->connect_error);
 }
 
 function delete_explanation_from_db($id) {
     global $mysqli;
     $mysqli->query("delete from explanations where id = $id") or die("Не удалось удалить объявление" . $mysqli->connect_error);
+}
+
+// Очистка таблиц, установка дампа
+function install_dump($db_name) {
+    global $project_root;
+    $dump_dir = $project_root . '/dump_db/';
+    $filename = $dump_dir . 'test.sql';
+
+    if (!file_exists($filename)) {
+        exit('Дамп базы не найден');
+    }
+    if (!file($filename)) {
+        exit('Ошибка: неверный формат файла ' . $filename);
+    } else {
+        dropOldTables($db_name);
+        parceDump($filename);
+    }
+    $message = "Базы данных установлены.<br>";
+    return $message;
+}
+
+function dropOldTables($db) {
+    global $mysqli;
+    $mysqli->query("SET FOREIGN_KEY_CHECKS = 0");
+    $query = "SELECT concat('DROP TABLE IF EXISTS ', table_name, ';') AS `drop` "
+            . "FROM information_schema.tables "
+            . "WHERE table_schema = '$db'";
+    $result = $mysqli->query($query) or die(mysql_error());
+    while ($row = $result->fetch_assoc()) {
+        $mysqli->query($row['drop']) or die(mysql_error());
+    }
+    $result->free();
+    $mysqli->query("SET FOREIGN_KEY_CHECKS = 1");
+}
+
+function parceDump($dump_filename, $i = 0, $j = 0) {
+    global $mysqli;
+    $dump = file($dump_filename, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    foreach ($dump as $key => $value) {
+        if (substr($value, 0, 2) == '--') {
+            unset($dump[$key]);
+        }
+    }
+    $str = implode('', $dump);
+    while ($i <= strlen($str) - 1) {
+        if ($str[$i] == ';') {
+            $query = substr($str, $j, $i - $j);
+            $mysqli->query($query) or die("<br>Не удалось выполнить запрос " . mysql_error());
+            $j = $i + 1;
+        }
+        $i++;
+    }
 }

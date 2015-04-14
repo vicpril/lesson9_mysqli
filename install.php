@@ -18,76 +18,77 @@ $smarty->compile_dir = $smarty_dir . 'templates_c';
 $smarty->cache_dir = $smarty_dir . 'cache';
 $smarty->config_dir = $smarty_dir . 'configs';
 
-function dropOldTables($db) {
-    global $mysqli;
-    $mysqli->query("SET FOREIGN_KEY_CHECKS = 0");
-    $query =  "SELECT concat('DROP TABLE IF EXISTS ', table_name, ';') AS `drop` "
-            . "FROM information_schema.tables "
-            . "WHERE table_schema = '$db'";
-    $result = $mysqli->query($query) or die(mysql_error());
-    while ($row = $result->fetch_assoc()) {
-        $mysqli->query($row['drop']) or die(mysql_error());
-    }
-    $result->free();
-    $mysqli->query("SET FOREIGN_KEY_CHECKS = 1");
-}
-
-function parceDump($dump_filename, $i = 0, $j = 0) {
-    global $mysqli;
-    $dump = file($dump_filename, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    foreach ($dump as $key => $value) {
-        if (substr($value, 0, 2) == '--') {
-            unset($dump[$key]);
-        }
-    }
-    $str = implode('', $dump);
-    while ($i <= strlen($str) - 1) {
-        if ($str[$i] == ';') {
-            $query = substr($str, $j, $i - $j);
-            $mysqli->query($query) or die("<br>Не удалось выполнить запрос " . mysql_error());
-            $j = $i + 1;
-        }
-        $i++;
-    }
-}
-
 //
 // Main block
 //
+
 $mysql_dir = $project_root;
 $page_from = 'install.php';
 $filename_user = 'user.php';
 
 if (!isset($_POST['button_install'])) {
+    // Стартовая страница index.php
     $smarty->assign('title', 'Вход в базу данных');
     $smarty->assign('message', 'Введите данные для подключения к БД');
     $smarty->assign('action', 'install.php');
     $smarty->display('user_ini.tpl');
     exit;
-}   
-if (file_exists($filename_user)){
-    unlink($filename_user);
-}
-
-include ($mysql_dir . '/mysql.php');
-db_setup();
-
-// Опепрации с дампом
-
-$dump_dir = $project_root . '/dump_db/';
-$filename = $dump_dir . 'test.sql';
-
-if (!file_exists($filename)) {
-    exit('Дамп базы не найден');
-}
-if (!file($filename)) {
-    exit('Ошибка: неверный формат файла ' . $filename);
 } else {
-    dropOldTables($user['db_name']);
-    parceDump($filename);
+    // Подключение к БД
+    if ($_POST['button_install'] == 'Вход в базу данных') {
+        $user['db_name'] = $_POST['database_name'];
+        $user['s_name'] = $_POST['server_name'];
+        $user['u_name'] = $_POST['user_name'];
+        $user['pas'] = $_POST['password'];
+
+        if (!file_put_contents($filename_user, serialize($user))) {
+            exit('Ошибка: не удалось записать фаил ' . $filename_user);
+        }
+    }
+    
+    $user = unserialize(file_get_contents($filename_user)); 
+
+    $mysqli = new mysqli($user['s_name'], $user['u_name'], $user['pas'], $user['db_name']);
+    if ($mysqli->connect_errno) {
+        exit("Не удалось подключиться к MySQL: (" . $mysqli->connect_errno . ") " . $mysqli->connect_error
+                . '<br><a href="#" onclick="history.go(-1)">Go Back</a>');
+    }
+    $mysqli->query("SET NAMES utf8");
+    $message = "Соединение с БД установлено.<br>";
+
+    include 'mysql.php';
+
+    // Проверка существования таблиц
+    $db_name = $user['db_name'];
+    $tables = array();
+    $query = "SHOW TABLES FROM $db_name";
+    $result = $mysqli->query($query);
+    while ($row = $result->fetch_array()) {
+        $tables[] = $row[0];
+    }
+    $result->free();
+    if (!in_array('explanations', $tables) &&
+        !in_array('categories_list', $tables) &&
+        !in_array('cities_list', $tables)) {
+
+        // Установка таблиц, если таблиц нет
+        $message .=install_dump($user['db_name']);
+    } else {
+
+        // Диалог восстановления из дампа
+        if ($_POST['button_install'] == 'Вход в базу данных') {
+            $smarty->display('install_dump.tpl');
+            exit;
+        } else {
+            if ($_POST['button_install'] == 'Да') {
+                $message .=install_dump($user['db_name']);
+            }
+            // Если 'Нет' - то отображаем 'install_ok.tpl'
+        }
+    }
+
+    // Страница ОК
+    $smarty->assign('action', 'index.php');
+    $smarty->assign('message', $message);
+    $smarty->display('install_ok.tpl');
 }
-$smarty->assign('action','install.php');
-$smarty->assign('message', $message);
-$smarty->display('install_ok.tpl');
-
-
