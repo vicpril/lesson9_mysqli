@@ -40,6 +40,10 @@ if (!isset($_POST['button_install'])) {
         $user['s_name'] = $_POST['server_name'];
         $user['u_name'] = $_POST['user_name'];
         $user['pas'] = $_POST['password'];
+        
+        if ($user['db_name'] == '') {
+        exit('Не введено имя базы данных. Заполните соответствующее поле. <br><a href="#" onclick="history.go(-1)">Go Back</a>');
+    }
 
         if (!file_put_contents($filename_user, serialize($user))) {
             exit('Ошибка: не удалось записать фаил ' . $filename_user);
@@ -67,8 +71,8 @@ if (!isset($_POST['button_install'])) {
         $tables[] = $row[0];
     }
     $result->free();
-    if (!in_array('explanations', $tables) &&
-        !in_array('categories_list', $tables) &&
+    if (!in_array('explanations', $tables) ||
+        !in_array('categories_list', $tables) ||
         !in_array('cities_list', $tables)) {
 
         // Установка таблиц, если таблиц нет

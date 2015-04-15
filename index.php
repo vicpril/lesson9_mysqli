@@ -52,23 +52,11 @@ $filename_user = 'user.php';
 
 // Проверка существования файла с данными
 if (!file_exists($filename_user)) {
-    if (!isset($_POST['button_install'])) {
-        // Форма ввода данных
-        $smarty->assign('title', 'Вход в базу данных');
-        $smarty->assign('message', 'Введите данные для подключения к БД');
-        $smarty->assign('action', 'index.php');
-        $smarty->display('user_ini.tpl');
-        exit;
-    } else {
-        // Запись данных в фаил
-        $user['db_name'] = $_POST['database_name'];
-        $user['s_name'] = $_POST['server_name'];
-        $user['u_name'] = $_POST['user_name'];
-        $user['pas'] = $_POST['password'];
-        if (!file_put_contents($filename_user, serialize($user))) {
-            exit('Ошибка: не удалось записать фаил ' . $filename_user);
-        }
-    }
+    
+    // переадресация, если фаил не существует
+    header("Refresh:10; url=install.php");
+    exit("Параметры подключения к БД не заданы. Через 10 сек. Вы будете перенаправлены на страницу INSTALL.</br>
+            Если автоматического перенаправления не происходит, нажмите <a href='install.php'>здесь</a>.");
 }
 
 // Подключение к БД
@@ -97,16 +85,15 @@ while ($row = $result->fetch_array()) {
     $tables[] = $row[0];
 }
 $result->free();
-if (!in_array('explanations', $tables) &&
-        !in_array('categories_list', $tables) &&
+if (!in_array('explanations', $tables) ||
+        !in_array('categories_list', $tables) ||
         !in_array('cities_list', $tables)) {
 
-    // Установка таблиц, если таблиц нет
-    $message .=install_dump($user['db_name']);
-    $smarty->assign('action', 'index.php');
-    $smarty->assign('message', $message);
-    $smarty->display('install_ok.tpl');
-    exit;
+    // Переадресация, если таблиц нет
+     
+    header("Refresh:10; url=install.php");
+    exit("Нарушена структура или отсутствуют таблицы в БД. Через 10 сек. Вы будете перенаправлены на страницу INSTALL.</br>
+            Если автоматического перенаправления не происходит, нажмите <a href='install.php'>здесь</a>."); 
 }
 
 // Работа скрипта
